@@ -13,100 +13,220 @@ from ai.prompts import (
 
 load_dotenv()
 
-
 TRANSFORMATION_SCHEMA = {
     "type": "object",
+
     "properties": {
 
-        "output_format": {
-            "type": "string",
-            "enum": [
-                "csv",
-                "excel",
-                "json",
-                "sql",
-                "txt"
-            ],
-            "description": "Requested output format."
-        },
-
-        "delimiter": {
-            "type": "string",
-            "description": (
-                "Delimiter to use for delimited text output. "
-                "Examples: | for pipe, , for comma, "
-                "\\t for tab, ; for semicolon. "
-                "Use an empty string when no delimiter is requested."
-            )
-        },
+        # =====================================================
+        # TRANSFORMATION OPERATIONS
+        # =====================================================
 
         "operations": {
+
             "type": "array",
-            "description": "Ordered list of transformations.",
+
+            "description": (
+                "Ordered list of data transformation operations. "
+                "Operations must be applied in the order provided."
+            ),
+
             "items": {
+
                 "type": "object",
+
                 "properties": {
 
+                    # -----------------------------------------
+                    # Operation type
+                    # -----------------------------------------
+
                     "operation": {
+
                         "type": "string",
+
                         "enum": [
                             "select_columns",
+                            "drop_columns",
                             "rename_columns",
                             "filter",
                             "remove_duplicates",
-                            "sort"
+                            "sort",
+                            "limit",
+                            "aggregate",
+                            "group_by"
                         ]
                     },
 
+
+                    # -----------------------------------------
+                    # Column list
+                    # -----------------------------------------
+
                     "columns": {
+
                         "type": "array",
+
                         "items": {
                             "type": "string"
                         }
                     },
 
-"rename_pairs": {
-    "type": "array",
-    "items": {
-        "type": "object",
-        "properties": {
-            "from": {
-                "type": "string"
-            },
-            "to": {
-                "type": "string"
-            }
-        },
-        "required": [
-            "from",
-            "to"
-        ]
-    }
-},
+
+                    # -----------------------------------------
+                    # Rename columns
+                    # -----------------------------------------
+
+                    "rename_pairs": {
+
+                        "type": "array",
+
+                        "items": {
+
+                            "type": "object",
+
+                            "properties": {
+
+                                "from": {
+                                    "type": "string"
+                                },
+
+                                "to": {
+                                    "type": "string"
+                                }
+                            },
+
+                            "required": [
+                                "from",
+                                "to"
+                            ]
+                        }
+                    },
+
+
+                    # -----------------------------------------
+                    # Filter
+                    # -----------------------------------------
 
                     "column": {
+
                         "type": "string"
                     },
 
+
                     "operator": {
+
                         "type": "string",
+
                         "enum": [
+
                             "equals",
                             "not_equals",
+
                             "greater_than",
                             "greater_than_or_equal",
+
                             "less_than",
                             "less_than_or_equal",
+
                             "contains"
                         ]
                     },
 
+
                     "value": {
+
                         "type": "string"
                     },
 
+
+                    # -----------------------------------------
+                    # Sort
+                    # -----------------------------------------
+
                     "ascending": {
+
                         "type": "boolean"
+                    },
+
+
+                    # -----------------------------------------
+                    # Limit
+                    # -----------------------------------------
+
+                    "count": {
+
+                        "type": "integer",
+
+                        "description": (
+                            "Number of rows to keep. "
+                            "Must be a positive integer."
+                        )
+                    },
+
+
+                    # -----------------------------------------
+                    # Group By
+                    # -----------------------------------------
+
+                    "group_columns": {
+
+                        "type": "array",
+
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+
+
+                    # -----------------------------------------
+                    # Aggregations
+                    # -----------------------------------------
+
+                    "aggregations": {
+
+                        "type": "array",
+
+                        "items": {
+
+                            "type": "object",
+
+                            "properties": {
+
+                                "column": {
+                                    "type": "string"
+                                },
+
+                                "function": {
+
+                                    "type": "string",
+
+                                    "enum": [
+
+                                        "sum",
+                                        "mean",
+                                        "average",
+                                        "min",
+                                        "max",
+                                        "count",
+                                        "count_distinct",
+                                        "median",
+                                        "std",
+                                        "variance"
+                                    ]
+                                },
+
+                                "alias": {
+                                    "type": "string"
+                                }
+                            },
+
+                            "required": [
+                                "column",
+                                "function",
+                                "alias"
+                            ]
+                        }
                     }
                 },
 
@@ -116,26 +236,79 @@ TRANSFORMATION_SCHEMA = {
             }
         },
 
+
+        # =====================================================
+        # OUTPUT FORMAT
+        # =====================================================
+
+        "output_format": {
+
+            "type": "string",
+
+            "enum": [
+                "csv",
+                "excel",
+                "json",
+                "sql",
+                "txt"
+            ]
+        },
+
+
+        # =====================================================
+        # DELIMITER
+        # =====================================================
+
+        "delimiter": {
+
+            "type": "string",
+
+            "description": (
+                "Delimiter for TXT output. "
+                "Examples: | , ; or tab. "
+                "Use empty string when no delimiter is requested."
+            )
+        },
+
+
+        # =====================================================
+        # VALIDATION
+        # =====================================================
+
         "validation_errors": {
+
             "type": "array",
+
             "items": {
                 "type": "string"
             }
         },
 
+
+        # =====================================================
+        # SUMMARY
+        # =====================================================
+
         "summary": {
+
             "type": "string"
         }
     },
 
+
+    # =========================================================
+    # REQUIRED TOP-LEVEL FIELDS
+    # =========================================================
+
     "required": [
-        "output_format",
+
         "operations",
+        "output_format",
+        "delimiter",
         "validation_errors",
         "summary"
     ]
 }
-
 
 def get_gemini_client():
     """
@@ -187,25 +360,23 @@ def create_transformation_plan(
     )
 
     user_prompt = build_user_prompt(
-        columns=columns,
-        data_types=data_types,
-        sample_data=sample_data,
-        user_instruction=user_instruction,
-        output_format=output_format
-    )
+    df=df,
+    user_instruction=user_instruction,
+    output_format=output_format
+)
 
     response = client.models.generate_content(
         model=model,
         contents=user_prompt,
         config=types.GenerateContentConfig(
-
-            system_instruction=SYSTEM_PROMPT,
-
-            temperature=0,
-
-            response_mime_type="application/json",
-
-            response_schema=TRANSFORMATION_SCHEMA
+    system_instruction=SYSTEM_PROMPT,
+    temperature=0,
+    response_mime_type="application/json",
+    response_schema=TRANSFORMATION_SCHEMA,
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(
+        disable=True
+    )
+            
         )
     )
 
